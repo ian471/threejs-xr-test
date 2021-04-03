@@ -1,14 +1,12 @@
 import * as THREE from 'https://unpkg.com/three@0.126.1/build/three.module.js'
+import { GLTFLoader } from 'https://unpkg.com/three@0.126.1/examples/jsm/loaders/GLTFLoader.js'
 import { VRButton } from 'https://unpkg.com/three@0.126.1/examples/jsm/webxr/VRButton.js'
 
 import { setupControllers } from './controllers.js'
 
-export { THREE }
+export { GLTFLoader, THREE }
 
-export function setupXr({
-  enableControllers = true,
-  enableDebugPlane = false
-}) {
+export function setupXr({ enableDebugPlane = false }) {
   // Set up the scene
   const scene = new THREE.Scene()
 
@@ -42,17 +40,26 @@ export function setupXr({
   }
 
   // Add a plane where debug text can be printed
-  const { setDebugText } = enableDebugPlane ? setupDebugPlane({ scene }) : {}
+  const { setDebugText, appendDebugText } = enableDebugPlane
+    ? setupDebugPlane({ scene })
+    : {}
+  window.addEventListener('log', e => {
+    let msg = e.detail.toString()
+    while (msg) {
+      appendDebugText(msg.slice(0, 80) + '\n')
+      msg = msg.slice(80)
+    }
+  })
 
-  // Set up controllers
-  if (enableControllers) {
+  // Return a function to call to set up controllers
+  const _setupControllers = args =>
     setupControllers({
       registerAnimationFrameCallback,
       renderer,
       scene,
-      setDebugText
+      setDebugText,
+      ...args
     })
-  }
 
   // Add the viewport and "Enter VR" button to the page
   document.body.appendChild(renderer.domElement)
@@ -63,7 +70,8 @@ export function setupXr({
     registerAnimationFrameCallback,
     renderer,
     scene,
-    setDebugText
+    setDebugText,
+    setupControllers: _setupControllers
   }
 }
 
@@ -88,7 +96,9 @@ export function setupDebugPlane({ scene }) {
   debugPlane.rotation.y = -0.1 * Math.PI
   scene.add(debugPlane)
 
+  let debugText = ''
   const setDebugText = text => {
+    debugText = text
     debugCanvasContext.clearRect(0, 0, debugCanvas.width, debugCanvas.height)
     const lines = text.split('\n')
     for (let r = 0; r < lines.length; ++r) {
@@ -96,7 +106,12 @@ export function setupDebugPlane({ scene }) {
     }
     debugTexture.needsUpdate = true
   }
-  setDebugText('Debug text will appear here.')
 
-  return { setDebugText }
+  const appendDebugText = text => {
+    setDebugText(debugText + text)
+  }
+
+  setDebugText('Debug text will appear here.\n')
+
+  return { setDebugText, appendDebugText }
 }

@@ -38,13 +38,10 @@
           document.write(document.title)
         </script>
       </h1>
-      <p>Click the button below to start.</p>
-      <pre id="log"></pre>
+      <p id="statusText">Loading...</p>
+      <pre id="logText"></pre>
     </header>
-    <script type="module">
-      import { setupXr } from './xr.js'
-      import { setupTestScene } from './testScene.js'
-
+    <script>
       // Redirect to https, since webXR requires it
       if (window.location.protocol !== 'https:') {
         window.location.protocol = 'https:'
@@ -52,12 +49,24 @@
 
       // Set up a function that logs to the screen, since Oculus browser
       // doesn't have a web console.
-      window.log = msg => (window.log.innerHTML += msg?.toString() + '\n')
+      window.log = msg => {
+        console.log(msg)
+        window.logText.innerHTML += msg?.toString() + '\n'
+        window.dispatchEvent(new CustomEvent('log', { detail: msg }))
+      }
       window.addEventListener('error', e => log('❌ ' + e.message))
       log('Log:')
+    </script>
+    <script type="module">
+      import { setupXr } from './xr.js'
+      import { setupTestScene } from './testScene.js'
 
-      const { renderer, scene } = setupXr({ enableDebugPlane: true })
-      setupTestScene({ renderer, scene })
+      const { renderer, scene, setupControllers, registerAnimationFrameCallback, setDebugText } = setupXr({
+        enableDebugPlane: true
+      })
+      setupTestScene({ renderer, scene, setupControllers, registerAnimationFrameCallback, setDebugText })
+
+      window.statusText.innerHTML = 'Click the button below to start.'
     </script>
   </body>
 </html>

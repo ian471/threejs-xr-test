@@ -1,11 +1,93 @@
-import { THREE } from './xr.js'
+import {
+  fetchProfile,
+  MotionController
+} from 'https://cdn.jsdelivr.net/npm/@webxr-input-profiles/motion-controllers@1.0/dist/motion-controllers.module.min.js'
+import { GLTFLoader, THREE } from './xr.js'
 
 export function setupControllers({
+  addMotionControllerToScene,
   registerAnimationFrameCallback,
   renderer,
   scene,
   setDebugText
 }) {
+  const motionControllers = []
+
+  renderer.xr.addEventListener('sessionstart', () => {
+    renderer.xr.getSession().addEventListener('inputsourceschange', () => {
+      renderer.xr
+        .getSession()
+        .inputSources.forEach(async (xrInputSource, i) => {
+          if (!motionControllers[i]) {
+            // Fetch the profile for this controller
+            const { profile, assetPath } = await fetchProfile(
+              xrInputSource,
+              'https://cdn.jsdelivr.net/npm/@webxr-input-profiles/assets@1.0/dist/profiles'
+            )
+
+            // Create a new MotionController object
+            const motionController = new MotionController(
+              xrInputSource,
+              profile,
+              assetPath
+            )
+            motionControllers[i] = motionController
+
+            // Update the controller's state on every frame
+            registerAnimationFrameCallback(() => {
+              motionController.updateFromGamepad()
+            })
+
+            // Load the controller model and add it to the scene
+            const loader = new GLTFLoader()
+            loader.load(assetPath, gltf => {
+              const grip = renderer.xr.getControllerGrip(i)
+              grip.add(gltf.scene)
+              scene.add(grip)
+              addMotionControllerToScene?.(motionController)
+            })
+          }
+        })
+    })
+  })
+  return
+
+  // See https://immersive-web.github.io/webxr-input-profiles/packages/motion-controllers/
+  renderer.xr.addEventListener('sessionstart', () => {
+    renderer.xr.getSession().addEventListener('inputsourceschange', event => {
+      event.added.forEach(async xrInputSource => {
+        const { profile, assetPath } = await fetchProfile(
+          xrInputSource,
+          'https://cdn.jsdelivr.net/npm/@webxr-input-profiles/assets@1.0/dist/profiles'
+        )
+        log(profile)
+        const motionController = new MotionController(
+          xrInputSource,
+          profile,
+          assetPath
+        )
+
+        // Load the controller model
+        log('Loading ' + assetPath)
+        const loader = new GLTFLoader()
+        loader.load(assetPath, gltf => {
+          log('controller loaded')
+          renderer.xr.getController()
+          scene.add(gltf.scene)
+        })
+
+        // Update on every frame
+        registerAnimationFrameCallback(() =>
+          motionController.updateFromGamepad()
+        )
+
+        addMotionControllerToScene?.(motionController)
+      })
+    })
+  })
+
+  return
+
   // Poll controller gamepad buttons
   const BUTTON_NAMES = [
     ['rtrigger', 'rsqueeze', null, 'rthumbstick', 'Abutton', 'Bbutton'],
